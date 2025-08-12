@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StatsOne - Researcher Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .dark {
+            color-scheme: dark;
+        }
+        .nav-item-active {
+            background-color: #1f2937; /* gray-800 */
+            color: #fff;
+        }
+    </style>
+</head>
+<body class="dark bg-gray-900 text-gray-100">
+    <div id="root"></div>
+
+    <script>
+        const root = document.getElementById('root');
+
+        // --- MOCK DATA AND STATE MANAGEMENT ---
+        const MOCK_USER_ID = 'mock-researcher-123';
+        let state = {
+            isAuthReady: false,
+            user: null,
+            currentPage: 'dataRequests',
+            requests: [],
+            isModalOpen: false,
+            selectedRequest: null,
+            profile: {
+                department: '',
+                isGovIdVerified: false,
+                isResearcherVerified: false
+            }
+        };
+
+        const saveState = () => {
+            // In a real app with a backend, this would be an API call.
+            // For this local version, we'll just log to the console.
+            console.log('State saved:', state);
+        };
+
+        // --- UI COMPONENTS (Simplified) ---
+
+        const NavItem = (icon, label, page) => {
+            const isActive = state.currentPage === page;
+            const classes = `flex items-center space-x-3 p-3 rounded-lg w-full text-left transition-colors duration-200 ${isActive ? 'nav-item-active text-white' : 'text-gray-400 hover:bg-gray-800'}`;
+            return `
+                <button class="${classes}" onclick="handleNavClick('${page}')">
+                    ${icon}
+                    <span>${label}</span>
+                </button>
+            `;
+        };
+
+        const getStatusIcon = (status) => {
+            switch (status) {
+                case 'pending': return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-400 lucide lucide-circle-dot"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>`;
+                case 'approved': return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-400 lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.86"/><path d="M15 6l2 2 4-4"/></svg>`;
+                default: return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-400 lucide lucide-file-search"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1"/><path d="M13 18h7"/><path d="M22 22l-1.5-1.5"/><path d="M4 22l-1.5-1.5"/><path d="M12 11V3l-2.5 1.5M12 11V3L14.5 4.5"/></svg>`;
+            }
+        };
+
+        const renderLoginPage = () => {
+            root.innerHTML = `
+                <div class="flex items-center justify-center min-h-screen bg-gray-900">
+                    <div class="bg-gray-950 p-8 rounded-xl shadow-2xl w-full max-w-sm text-gray-100 border border-gray-800">
+                        <div class="flex flex-col items-center mb-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400 lucide lucide-database"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+                            <h2 class="text-2xl font-bold mt-4">Welcome Back</h2>
+                            <p class="text-gray-500 text-sm mt-1">Log in as a researcher</p>
+                        </div>
+                        <form id="loginForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-400">Email</label>
+                                <input type="email" id="email" class="w-full p-3 border border-gray-700 rounded-lg bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white" placeholder="researcher@example.com" value="researcher@example.com"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-400">Password</label>
+                                <input type="password" id="password" class="w-full p-3 border border-gray-700 rounded-lg bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 text-white" placeholder="password123" value="password123"/>
+                            </div>
+                            <div id="loginError" class="text-red-400 text-sm"></div>
+                            <button type="submit" class="w-full p-3 bg-blue-500 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">Log In</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+            document.getElementById('loginForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                if (email === 'researcher@example.com' && password === 'password123') {
+                    state.user = { uid: MOCK_USER_ID };
+                    render();
+                } else {
+                    document.getElementById('loginError').textContent = 'Invalid credentials. Use researcher@example.com / password123';
+                }
+            });
+        };
+
+        const renderMainApp = () => {
+            root.innerHTML = `
+                <div class="min-h-screen flex font-inter bg-gray-900 text-gray-100">
+                    <nav class="w-64 bg-gray-950 p-4 flex flex-col justify-between shadow-xl border-r border-gray-800">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-8 p-2">
+                                <div class="p-1 rounded-md text-blue-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-database"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+                                </div>
+                                <h1 class="text-xl font-bold">StatsOne</h1>
+                            </div>
+                            <div class="space-y-1">
+                                ${NavItem(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>`, 'Data Requests', 'dataRequests')}
+                                ${NavItem(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`, 'Profile', 'profile')}
+                                ${NavItem(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`, 'Researchers Publish', 'researchersPublish')}
+                            </div>
+                        </div>
+                        <div class="flex flex-col space-y-4">
+                            <div class="text-xs text-gray-500 break-words">
+                                User ID: ${state.user.uid}
+                            </div>
+                            <button onclick="handleLogout()" class="flex items-center space-x-3 text-gray-400 hover:text-white transition-colors duration-200 p-2 rounded-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-in"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+                                <span>Log Out</span>
+                            </button>
+                        </div>
+                    </nav>
+                    <main class="flex-1 p-8 overflow-y-auto">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="bg-gray-800 rounded-xl shadow-xl p-8">
+                                ${renderPageContent()}
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            `;
+        };
+
+        const renderPageContent = () => {
+            switch (state.currentPage) {
+                case 'dataRequests': return renderDataRequestsPage();
+                case 'profile': return renderProfilePage();
+                case 'researchersPublish': return renderResearchersPublishPage();
+                default: return `<div>Page not found</div>`;
+            }
+        };
+
+        const renderDataRequestsPage = () => {
+            let currentTab = 'newRequest';
+            const tabButtons = `
+                <div class="flex border-b border-gray-700">
+                    <button onclick="handleTabClick('newRequest')" class="flex items-center space-x-2 px-4 py-2 border-b-2 transition-colors duration-200 ${currentTab === 'newRequest' ? 'text-white border-blue-500' : 'text-gray-400 border-transparent hover:text-white'}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                        <span>New Request</span>
+                    </button>
+                    <button onclick="handleTabClick('olderRequests')" class="flex items-center space-x-2 px-4 py-2 border-b-2 transition-colors duration-200 ${currentTab === 'olderRequests' ? 'text-white border-blue-500' : 'text-gray-400 border-transparent hover:text-white'}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                        <span>Request History</span>
+                    </button>
+                    <button onclick="handleTabClick('dataAnalysis')" class="flex items-center space-x-2 px-4 py-2 border-b-2 transition-colors duration-200 ${currentTab === 'dataAnalysis' ? 'text-white border-blue-500' : 'text-gray-400 border-transparent hover:text-white'}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bar-chart-2"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>
+                        <span>Data Analysis</span>
+                    </button>
+                </div>
+            `;
+            const renderContent = () => {
+                switch (currentTab) {
+                    case 'newRequest': return renderNewRequestPage();
+                    case 'olderRequests': return renderOlderRequestsPage();
+                    case 'dataAnalysis': return renderDataAnalysisPage();
+                    default: return `<div>Tab not found</div>`;
+                }
+            };
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-semibold">Data Requests</h2>
+                    ${tabButtons}
+                    <div class="py-4" id="dataRequestTabContent">
+                        ${renderContent()}
+                    </div>
+                </div>
+            `;
+        };
+        
+        const renderNewRequestPage = () => {
+            const indiaStates = [
+                'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+                'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+                'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+                'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim',
+                'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
+                'West Bengal'
+            ];
+
+            const filterOptions = {
+                'State': indiaStates,
+                'District': ['District A', 'District B', 'District C'],
+                'Age Bracket': ['18-25', '26-35', '36-45', '46-55', '56+'],
+                'Gender': ['Male', 'Female', 'Other'],
+            };
+            
+            // Render filter rows
+            const filtersHtml = state.requests.map((filter, index) => `
+                <div class="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4 p-4 bg-gray-900 rounded-lg">
+                    <div class="w-full md:w-1/3">
+                        <select id="field-${index}" class="w-full p-2 border border-gray-700 rounded-md bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="" disabled>Select Filter</option>
+                            ${Object.keys(filterOptions).map(option => `<option value="${option}">${option}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="w-full md:w-1/3">
+                        <select id="value-${index}" class="w-full p-2 border border-gray-700 rounded-md bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="" disabled>Select Value</option>
+                            ${filterOptions[state.requests[index].field] ? filterOptions[state.requests[index].field].map(value => `<option value="${value}">${value}</option>`).join('') : ''}
+                        </select>
+                    </div>
+                    <button onclick="removeFilter(${index})" class="p-2 text-red-400 hover:text-red-500 disabled:opacity-50 transition-colors" ${state.requests.length === 1 ? 'disabled' : ''}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                    </button>
+                </div>
+            `).join('');
+
+            return `
+                <div class="space-y-6">
+                    <div class="space-y-4">
+                        ${filtersHtml}
+                    </div>
+                    <div class="flex justify-between items-center mt-6">
+                        <button onclick="addFilter()" class="flex items-center space-x-2 px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                            <span>Add Filter</span>
+                        </button>
+                        <button onclick="submitRequest()" class="flex items-center space-x-2 px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-600 transition-colors disabled:opacity-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                            <span>Submit Request</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderOlderRequestsPage = () => {
+             const getStatusIcon = (status) => {
+                switch (status) {
+                    case 'pending': return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-400 lucide lucide-circle-dot"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>`;
+                    case 'approved': return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-400 lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.86"/><path d="M15 6l2 2 4-4"/></svg>`;
+                    default: return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-400 lucide lucide-file-search"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1"/><path d="M13 18h7"/><path d="M22 22l-1.5-1.5"/><path d="M4 22l-1.5-1.5"/><path d="M12 11V3l-2.5 1.5M12 11V3L14.5 4.5"/></svg>`;
+                }
+            };
+            const rowsHtml = state.requests.map((request) => `
+                <tr onclick="openModal(${JSON.stringify(request).replace(/"/g, '&quot;')})" class="cursor-pointer hover:bg-gray-700 transition-colors duration-150">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
+                        ${request.requestDate}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                        ${request.filters.map(f => `${f.field}:${f.value}`).join(' | ')}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <div class="flex items-center space-x-2">
+                            ${getStatusIcon(request.status)}
+                            <span class="capitalize">${request.status}</span>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+            return `
+                <div class="space-y-4">
+                    ${state.requests.length === 0 ? `<div class="text-center p-8 text-gray-500">No older requests found. Submit a new request!</div>` : `
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-900">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Request Date</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Filters Applied</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-gray-800 divide-y divide-gray-700">
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    `}
+                    ${state.isModalOpen ? renderModal() : ''}
+                </div>
+            `;
+        };
+
+        const renderModal = () => {
+            if (!state.selectedRequest) return '';
+            return `
+                <div class="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-75 flex items-center justify-center">
+                    <div class="bg-gray-800 rounded-xl shadow-2xl p-6 m-4 max-w-2xl w-full text-white">
+                        <div class="flex justify-between items-center pb-4 border-b border-gray-700">
+                            <h3 class="text-xl font-semibold">Request Details</h3>
+                            <button onclick="closeModal()" class="text-gray-400 hover:text-white">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                            </button>
+                        </div>
+                        <div class="py-4">
+                            <pre class="whitespace-pre-wrap p-4 bg-gray-900 rounded-lg text-sm text-gray-100 overflow-x-auto">
+                                ${JSON.stringify(state.selectedRequest, null, 2)}
+                            </pre>
+                        </div>
+                        <div class="flex justify-end pt-4">
+                            <button onclick="closeModal()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderDataAnalysisPage = () => {
+            const previousResearch = [
+                { id: 1, title: 'Demographic Study of Rajasthan', filters: 'State: Rajasthan | Age: 26-35', date: '2023-01-15', insights: 'Discovered a high concentration of tech workers in Jaipur within this age bracket.' },
+                { id: 2, title: 'Income Trends in Maharashtra', filters: 'State: Maharashtra | Income: >$100k', date: '2023-03-20', insights: 'Analyzed the growth of high-income households in Mumbai and Pune.' },
+                { id: 3, title: 'Gender Distribution in Kerala', filters: 'State: Kerala | Gender: Female', date: '2023-05-10', insights: 'Studied the high literacy rate among women and its correlation with employment.' }
+            ];
+            const researchHtml = previousResearch.map(project => `
+                <div key="${project.id}" class="p-4 bg-gray-900 rounded-lg shadow-inner border border-gray-700">
+                    <h3 class="text-xl font-bold text-blue-400">${project.title}</h3>
+                    <p class="text-sm text-gray-500 mt-1">Filters: ${project.filters}</p>
+                    <p class="text-sm text-gray-500">Date: ${project.date}</p>
+                    <p class="mt-2 text-gray-300">${project.insights}</p>
+                </div>
+            `).join('');
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-semibold">Data Analysis</h2>
+                    <p class="text-gray-400">
+                        This page shows a history of your past research projects and the data used for analysis.
+                    </p>
+                    <div class="space-y-4">
+                        ${researchHtml}
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderProfilePage = () => {
+            return `
+                <div class="space-y-8">
+                    <h2 class="text-3xl font-semibold">User Profile</h2>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-2 text-gray-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <h3 class="text-xl font-bold text-white">Researcher Information</h3>
+                        </div>
+                        <div class="bg-gray-900 p-6 rounded-lg border border-gray-700 space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-400">Researcher ID</label>
+                                <p class="p-3 bg-gray-800 rounded-lg text-white font-mono">${state.user.uid}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-400">User ID</label>
+                                <p class="p-3 bg-gray-800 rounded-lg text-white font-mono">${state.user.uid}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-gray-400">Government Department or Private Firm</label>
+                                <input id="departmentInput" type="text" value="${state.profile.department}" onchange="handleProfileChange('department', this.value)" class="w-full p-3 border border-gray-700 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Ministry of Statistics"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-2 text-gray-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-check"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="m9 14 2 2 4-4"/></svg>
+                            <h3 class="text-xl font-bold text-white">Identity Verification</h3>
+                        </div>
+                        <div class="bg-gray-900 p-6 rounded-lg border border-gray-700 space-y-6">
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <h4 class="text-lg font-semibold text-gray-300">Government ID Proof (Aadhaar)</h4>
+                                    ${state.profile.isGovIdVerified ? `<span class="flex items-center text-green-400 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.86"/><path d="M15 6l2 2 4-4"/></svg> Verified</span>` : ''}
+                                </div>
+                                <div class="flex space-x-2">
+                                    <input id="govIdInput" type="text" class="flex-1 p-3 border border-gray-700 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter 12-digit Aadhaar ID" ${state.profile.isGovIdVerified ? 'disabled' : ''}/>
+                                    <button onclick="handleGovIdVerify()" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 transition-colors disabled:opacity-50" ${state.profile.isGovIdVerified ? 'disabled' : ''}>
+                                        Verify
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <h4 class="text-lg font-semibold text-gray-300">Researcher Identity</h4>
+                                    ${state.profile.isResearcherVerified ? `<span class="flex items-center text-green-400 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle"><path d="M22 11.08V12a10 10 0 1 1-5.93-8.86"/><path d="M15 6l2 2 4-4"/></svg> Verified</span>` : ''}
+                                </div>
+                                <div class="flex space-x-2">
+                                    <input id="researcherIdInput" type="text" class="flex-1 p-3 border border-gray-700 rounded-lg bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter institution ID" ${state.profile.isResearcherVerified ? 'disabled' : ''}/>
+                                    <button onclick="handleResearcherIdVerify()" class="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 transition-colors disabled:opacity-50" ${state.profile.isResearcherVerified ? 'disabled' : ''}>
+                                        Verify
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderResearchersPublishPage = () => {
+            const publications = [
+                { id: 1, title: 'A New Approach to Anonymized Data Aggregation', authors: 'Jane Doe, John Smith', date: '2023-08-10', summary: 'This paper presents a novel algorithm for aggregating large-scale datasets while preserving individual privacy using differential privacy techniques.' },
+                { id: 2, title: 'Statistical Trends in Indian Demographics (2018-2022)', authors: 'Priya Sharma, Rohan Mehta', date: '2023-07-25', summary: 'An analysis of anonymized demographic data from various states in India, highlighting key shifts in age, income, and gender distribution over a five-year period.' },
+                { id: 3, title: 'The Impact of Technology on Rural Employment', authors: 'Alex Chen', date: '2023-06-01', summary: 'A study on how the integration of digital tools has influenced employment rates and types of jobs in rural areas across India.' }
+            ];
+            const publicationsHtml = publications.map(pub => `
+                <div key="${pub.id}" class="p-4 bg-gray-900 rounded-lg shadow-inner border border-gray-700">
+                    <h3 class="text-xl font-bold text-blue-400">${pub.title}</h3>
+                    <p class="text-sm text-gray-500 mt-1">Authors: ${pub.authors}</p>
+                    <p class="text-sm text-gray-500">Published: ${pub.date}</p>
+                    <p class="mt-2 text-gray-300">${pub.summary}</p>
+                </div>
+            `).join('');
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-3xl font-semibold">Researchers Publish</h2>
+                    <p class="text-gray-400">
+                        A showcase of recent research papers and publications from users of the StatsOne platform.
+                    </p>
+                    <div class="space-y-4">
+                        ${publicationsHtml}
+                    </div>
+                </div>
+            `;
+        };
+
+        // --- Event Handlers and Core Logic ---
+        const handleNavClick = (page) => {
+            state.currentPage = page;
+            render();
+        };
+
+        const handleTabClick = (tab) => {
+            // This is a simplified handler. In a full app, you would manage state for tabs.
+            // For this version, we'll just re-render the page content with the correct tab.
+            const dataRequestTabContent = document.getElementById('dataRequestTabContent');
+            if (dataRequestTabContent) {
+                switch(tab) {
+                    case 'newRequest': dataRequestTabContent.innerHTML = renderNewRequestPage(); break;
+                    case 'olderRequests': dataRequestTabContent.innerHTML = renderOlderRequestsPage(); break;
+                    case 'dataAnalysis': dataRequestTabContent.innerHTML = renderDataAnalysisPage(); break;
+                }
+            }
+        };
+
+        const handleLogout = () => {
+            state.user = null;
+            render();
+        };
+
+        const openModal = (request) => {
+            state.selectedRequest = request;
+            state.isModalOpen = true;
+            render();
+        };
+
+        const closeModal = () => {
+            state.isModalOpen = false;
+            state.selectedRequest = null;
+            render();
+        };
+
+        const addFilter = () => {
+            state.requests.push({ field: '', operator: 'equals', value: '' });
+            render();
+        };
+
+        const removeFilter = (index) => {
+            state.requests.splice(index, 1);
+            render();
+        };
+
+        const submitRequest = () => {
+            // Mock submission and data addition
+            const newRequest = {
+                id: Math.random().toString(36).substring(2, 9),
+                userId: state.user.uid,
+                filters: [{ field: 'State', value: 'Maharashtra' }],
+                status: 'pending',
+                requestDate: new Date().toLocaleString()
+            };
+            state.requests.unshift(newRequest); // Add to the beginning of the list
+            state.currentPage = 'dataRequests';
+            // In a real app, you would handle the tab state correctly
+            render();
+        };
+
+        const handleProfileChange = (key, value) => {
+            state.profile[key] = value;
+            saveState(); // Mock save
+        };
+
+        const handleGovIdVerify = () => {
+            state.profile.isGovIdVerified = true;
+            render();
+        };
+
+        const handleResearcherIdVerify = () => {
+            state.profile.isResearcherVerified = true;
+            render();
+        };
+
+        const render = () => {
+            if (!state.user) {
+                renderLoginPage();
+            } else {
+                renderMainApp();
+            }
+        };
+
+        // Initialize with a mock user for convenience in this single-file demo
+        state.user = { uid: MOCK_USER_ID };
+        state.requests.push({ id: 1, userId: MOCK_USER_ID, filters: [{ field: 'State', value: 'Kerala' }], status: 'approved', requestDate: '8/13/2023, 12:00:00 AM' });
+        
+        render();
+
+    </script>
+</body>
+</html>
