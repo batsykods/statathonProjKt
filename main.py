@@ -1,4 +1,11 @@
 from fastapi import FastAPI
+from . import models
+from .database import engine
+
+# 2. Create the database tables (this is the best place for it)
+models.Base.metadata.create_all(bind=engine)
+
+# 3. Create your FastAPI app instance
 
 app = FastAPI(
     title="Privacy-Preserving Data Platform API",
