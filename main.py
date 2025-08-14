@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from . import models
-from .database import engine
+import models
+from database import engine
 
 # 2. Create the database tables (this is the best place for it)
 models.Base.metadata.create_all(bind=engine)
