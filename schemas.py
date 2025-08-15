@@ -9,9 +9,8 @@ class DatasetBase(BaseModel):
 class DatasetCreate(DatasetBase):
     pass
 
-class Dataset(DatasetBase):
+class DatasetResponse(DatasetBase):
     id: int
 
     class Config:
-        from_attributes = True # Pydantic v2
-        # orm_mode = True # Pydantic v1
+        from_attributes = True
