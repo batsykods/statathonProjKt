@@ -27,6 +27,11 @@ lib-cov
 coverage
 *.lcov
 
+venv/
+__pycache__/
+.vscode/
+.env
+
 # nyc test coverage
 .nyc_output
 
@@ -354,5 +359,7 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+# foldersN files
+.env
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,node,windows
