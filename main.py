@@ -14,12 +14,22 @@ app = FastAPI(title="Data Privacy API")
 
 # --- CORS MIDDLEWARE ---
 # This must be configured to allow headers like "Authorization"
+# in main.py
+
+# --- CORS MIDDLEWARE ---
+# Define the list of allowed origins (your frontend addresses)
+origins = [
+    "http://localhost:3000",
+    "https://statsone.vercel.app", # Your main Vercel domain
+    "https://statathonfrontend.vercel.app" # Another possible domain based on your logs
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=origins, # Use the list of origins
     allow_credentials=True,
-    allow_methods=["*"], # Allows all methods
-    allow_headers=["*"], # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- FAKER INSTANCE ---
