@@ -18,12 +18,24 @@ app = FastAPI(title="Data Privacy API")
 
 # --- CORS MIDDLEWARE ---
 # Define the list of allowed origins (your frontend addresses)
+# in main.py
+
+# --- CORS MIDDLEWARE ---
+# Define the list of allowed origins (your frontend addresses)
 origins = [
     "http://localhost:3000",
-    "https://statsone.vercel.app", # Your main Vercel domain
-    "https://statathonfrontend.vercel.app" # Another possible domain based on your logs
+    "https://statsone.vercel.app",
+    "https://statathonfrontend.vercel.app",
+    "https://statathonfrontend-7ggrf929y-sarthaks-projects-195d5415.vercel.app" # Add this new URL
 ]
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins, # Use the list of origins
