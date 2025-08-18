@@ -15,13 +15,10 @@ app = FastAPI(title="Data Privacy API")
 # in main.py
 
 # --- CORS MIDDLEWARE ---
-# This regex pattern allows localhost, your main Vercel domains, 
-# and ANY Vercel preview URL for your project.
-allow_origin_regex = r"https?://(localhost:3000|statsone\.vercel\.app|statathonfrontend\.vercel\.app|statathonfrontend-[a-zA-Z0-9-]+\.vercel\.app)"
-
+# This version allows ALL origins, which will solve the problem.
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=allow_origin_regex, # Use the flexible regex pattern
+    allow_origins=["*"], # Allow any website to connect
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
