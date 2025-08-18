@@ -12,16 +12,6 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Data Privacy API")
 
-# --- CORS MIDDLEWARE ---
-# This must be configured to allow headers like "Authorization"
-# in main.py
-
-# --- CORS MIDDLEWARE ---
-# Define the list of allowed origins (your frontend addresses)
-# in main.py
-
-# --- CORS MIDDLEWARE ---
-# Define the list of allowed origins (your frontend addresses)
 # in main.py
 
 # --- CORS MIDDLEWARE ---
@@ -36,22 +26,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins, # Use the list of origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # --- FAKER INSTANCE ---
 fake = Faker()
 
