@@ -53,6 +53,17 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     access_token = auth.create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+# in main.py
+
+# --- THIS IS THE NEW DEBUGGING ENDPOINT ---
+@app.get("/debug-cors")
+def debug_cors_settings():
+    """
+    An endpoint to check the CORS settings of the running application.
+    """
+    # This will return the exact origins list the app is configured with.
+    return {"allowed_origins": app.user_middleware[0].options['allow_origins']}
+
 @app.post("/datasets/load-school-data/")
 def load_school_data(db: Session = Depends(get_db)):
     try:
