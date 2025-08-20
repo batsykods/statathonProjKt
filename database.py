@@ -7,17 +7,10 @@ from sqlalchemy.ext.declarative import declarative_base
 db_url = os.getenv("DATABASE_URL")
 
 # This is the critical fix:
-# Render's PostgreSQL requires SSL. If the URL is for a Render database,
-# we need to ensure it uses SSL.
+# Change the protocol from 'postgres' to 'postgresql+pg8000'
+# to tell SQLAlchemy to use the new, more compatible driver.
 if db_url and db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-# Another common issue is that the default driver doesn't work well on Render
-# We will use a more compatible one if needed.
-# if db_url and "onrender.com" in db_url:
-#     if "?sslmode=require" not in db_url:
-#         db_url += "?sslmode=require"
-
+    db_url = db_url.replace("postgres://", "postgresql+pg8000://", 1)
 
 SQLALCHEMY_DATABASE_URL = db_url
 
